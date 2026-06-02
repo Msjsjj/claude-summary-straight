@@ -21,6 +21,15 @@ import re
 import json
 
 
+def read_discipline(content):
+    m = re.search(r'^discipline\s*:\s*(\S+)', content, re.MULTILINE)
+    if m:
+        val = m.group(1).split('#')[0].strip()
+        if val in ('stem', 'law', 'politics'):
+            return val
+    return None
+
+
 def check_external_urls(content):
     # 去掉 frontmatter，只检查正文
     body = re.sub(r'^---.*?^---\s*', '', content, count=1, flags=re.DOTALL | re.MULTILINE)
@@ -34,14 +43,20 @@ def check_external_urls(content):
     }
 
 
-def check_example_present(content):
+def check_example_present(content, discipline=None):
     # 检查正式例题段落：**例题** 加粗格式，而非散文中偶然出现的"例题"二字
     has = bool(re.search(r'\*\*例题\*\*', content))
+    tips = {
+        'stem':     "未发现正式例题。计算类章节（银行家算法、页面置换等）必须含 **例题** 加粗段落；描述类章节也应提供典型场景案例。",
+        'law':      "未发现正式例题。法学章节应含 **例题** 加粗段落，覆盖案例分析题（效力/责任判断或制度区分），骨架复用正文要件清单与对比表。",
+        'politics': "未发现正式例题。政治章节应含 **例题** 加粗段落，覆盖高频简答/论述题，骨架从该知识点自身结构展开。",
+    }
+    tip = tips.get(discipline, "未发现正式例题。笔记应含 **例题** 加粗段落，覆盖本章核心考点。")
     return {
         "check": "example_present",
         "description": "笔记应含正式例题（**例题** 加粗格式）",
         "passed": has,
-        "tip": "未发现正式例题。计算类章节（银行家算法、页面置换、PV操作等）必须含 **例题** 加粗段落；描述类章节也应提供典型场景案例。"
+        "tip": tip
     }
 
 
@@ -85,9 +100,10 @@ def run(path):
     except Exception as e:
         return {"error": str(e)}
 
+    discipline = read_discipline(content)
     checks = [
         check_external_urls(content),
-        check_example_present(content),
+        check_example_present(content, discipline),
         check_frontmatter(content),
         check_wikilink(content),
     ]

@@ -125,12 +125,23 @@ def check_meta_rules_leak(content: str) -> dict:
 
 
 def check_closing_blocks(content: str) -> dict:
-    """检查收尾板块数量是否超标（> 2 视为不合格）。"""
+    """检查收尾板块数量是否超标（> 2×N 视为不合格，N 为节数）。
+
+    多节合一文件按节缩放收尾板块上限，单节文件 N=1 行为不变。
+    """
     closing_indicators = [
         "易错点", "考前速记", "最小复习清单", "高频题型",
         "复习顺序", "建议复习顺序", "关键参数", "总结归纳",
         "知识地图", "速记卡",
     ]
+
+    # 多节合一文件按节缩放收尾板块上限，单节文件 N=1 行为不变
+    # 匹配 ## 第X节 或 ## [预留] 第X节 形式的二级节标题（预留节也计入）
+    section_re = re.compile(r'^##\s+(?:\[.*?\]\s*)?第[一二三四五六七八九十百千]+节')
+    n_sections = sum(1 for line in content.split('\n') if section_re.match(line.strip()))
+    if n_sections == 0:
+        n_sections = 1
+    limit = 2 * n_sections
 
     found_headings = []
     lines = content.split('\n')
@@ -144,10 +155,11 @@ def check_closing_blocks(content: str) -> dict:
 
     return {
         "check": "closing_blocks_count",
-        "description": "收尾板块数量检查（≤ 2）",
-        "passed": len(found_headings) <= 2,
+        "description": f"收尾板块数量检查（≤ {limit}，文件含 {n_sections} 节）",
+        "passed": len(found_headings) <= limit,
         "count": len(found_headings),
-        "limit": 2,
+        "limit": limit,
+        "n_sections": n_sections,
         "found": found_headings,
     }
 
